@@ -1,6 +1,4 @@
 # CMSC 858D Assignment 2
-========================
-
 
 To build the code run `make`. You can build the debug version with `make DEBUG=1`.
 
