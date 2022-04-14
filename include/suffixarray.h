@@ -16,6 +16,7 @@
 #include "libsais.h"
 
 /* local includes */
+#include "utilities.h"
 #include "serial.h"
 
 namespace suffixarray {
@@ -149,12 +150,21 @@ private:
     SuffixArray(std::string const& data, size_t prefixTableSize=0)
         : data_(data+"$"), prefixTableSize_(prefixTableSize), suffixes_(data_.size()) {
 
-        (void)prefixTableSize_;
-
         const uint8_t *rawData = reinterpret_cast<const uint8_t*>(data_.c_str());
+
+        #if defined(_OPENMP)
+        auto result = libsais_omp(rawData, suffixes_.data(), data_.size(), 0, histogram_.data(), 0);
+        #else
         auto result = libsais(rawData, suffixes_.data(), data_.size(), 0, histogram_.data());
+        #endif
+        
         if (result != 0) {
             throw std::runtime_error("SAIS Error -- Could not generate suffix array.");
+        }
+
+        /* build table for prefixes */
+        if (prefixTableSize_ != 0) {
+
         }
     }
 };
