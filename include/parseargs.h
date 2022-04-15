@@ -65,6 +65,24 @@ public:
     }
 
     /**
+     * @brief Retrieve a value from the parsed arguments list with default.
+     * 
+     * @tparam T The type of the argument to return
+     * @param key Argument name.
+     * @param def Default value.
+     * @param stringToT Function that casts a string to the expected return type T.
+     * @return T return value
+     */
+    template <typename T>
+    T get(std::string const& key, T const& def, std::function<T(std::string const&)> stringToT) const {
+        if (!kvStore_.contains(key)) {
+            return def;
+        }
+        auto const& value = kvStore_.at(key);
+        return stringToT(value);
+    }
+
+    /**
      * @brief Wrapper for `get` for integer types.
      * 
      * @param key Argument name.
@@ -75,6 +93,17 @@ public:
     }
 
     /**
+     * @brief Wrapper for `get` for integer types with default value.
+     * 
+     * @param key Argument name.
+     * @param def Default value.
+     * @return int32_t value passed to argument.
+     */
+    int32_t getInteger(std::string const& key, int32_t def) const {
+        return get<int32_t>(key, def, [](std::string const& s) -> auto { return std::stoi(s); });
+    }
+
+    /**
      * @brief Wrapper for `get` for string types.
      * 
      * @param key Argument name.
@@ -82,6 +111,17 @@ public:
      */
     std::string getString(std::string const& key) const {
         return get<std::string>(key, [](std::string const& s) -> auto { return s; });
+    }
+
+    /**
+     * @brief Wrapper for `get` for string types with default.
+     * 
+     * @param key Argument name.
+     * @param def Default value.
+     * @return std::string value passed to argument.
+     */
+    std::string getString(std::string const& key, std::string const& def) const {
+        return get<std::string>(key, def, [](std::string const& s) -> auto { return s; });
     }
 
 private:
