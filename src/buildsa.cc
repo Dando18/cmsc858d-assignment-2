@@ -22,9 +22,7 @@ int main(int argc, char **argv) {
     int preftab;
     std::string referencePath, outputPath;
     try {
-        if (args.has("preftab")) {
-            preftab = args.getInteger("preftab");
-        }
+        preftab = args.getInteger("preftab", 0);
         referencePath = args.getString("reference");
         outputPath = args.getString("output");
     } catch (std::invalid_argument const& e) {
@@ -32,7 +30,10 @@ int main(int argc, char **argv) {
         std::exit(1);
     }
 
-    auto suffixarray = suffixarray::SuffixArray::fromFile(referencePath);
+
+    auto suffixarray = suffixarray::SuffixArray::fromFile(referencePath, preftab);
+
+    std::cout << "\n" << suffixarray;
 
     suffixarray.save(outputPath);
 }
