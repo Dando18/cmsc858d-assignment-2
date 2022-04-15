@@ -8,7 +8,7 @@
 #pragma once
 
 /* stl include */
-#include <algorithm>    // adjacent_find, find_if_not
+#include <algorithm>    // find, find_if_not
 #include <array>        // array
 #include <exception>    // ios_base::failure
 #include <fstream>      // ifstream
@@ -21,6 +21,7 @@
 
 /* local includes */
 #include "serial.h"     // serialize, deserialize
+#include "utilities.h"  // Timer
 
 namespace suffixarray {
 
@@ -201,11 +202,22 @@ private:
     SuffixArray(std::string const& data, size_t prefixTableSize=0)
         : data_(data+"$"), prefixTableSize_(prefixTableSize), suffixes_(data_.size()) {
 
-        this->buildSuffixArray();
+        utilities::Timer timer;
 
+        timer.start();
+        this->buildSuffixArray();
+        timer.stop();
+        const auto saBuildTime = timer.secondsElapsed();
+
+        double prefixBuildTime = 0.0;
         if (prefixTableSize_ != 0) {
+            timer.start();
             this->buildPrefixTable();
+            timer.stop();
+            prefixBuildTime = timer.secondsElapsed();
         }
+
+        std::cout << data.size() << "," << prefixTableSize_ << "," << saBuildTime << "," << prefixBuildTime << "\n";
     }
 
     /**
