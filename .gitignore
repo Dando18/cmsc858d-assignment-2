@@ -1,3 +1,8 @@
 bin/*
 *.o
 docs
+
+# keep some input files from git history
+inputs/ecoli.fa
+inputs/query.fa
+inputs/query_res.txt
