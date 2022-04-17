@@ -1,6 +1,8 @@
 bin/*
 *.o
 docs
+results
+figs
 
 # keep some input files from git history
 inputs/ecoli.fa
