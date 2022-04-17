@@ -12,9 +12,9 @@
 #include <array>        // array
 #include <exception>    // ios_base::failure
 #include <fstream>      // ifstream
-#include <map>          // map
 #include <ostream>      // ostream
 #include <string>       // string
+#include <unordered_map>// unordered_map
 
 /* tpl includes */
 #include "libsais.h"    // libsais, libsais_omp
@@ -23,10 +23,13 @@
 #include "serial.h"     // serialize, deserialize
 #include "utilities.h"  // Timer
 
+
 namespace suffixarray {
 
 class SuffixArray {
     constexpr static uint32_t FILE_MAGIC = 0xabeefdad;
+    typedef std::unordered_map<std::string, std::pair<int32_t, int32_t>> PrefixTable;
+    enum QueryMode { Naive, SimpleAccelerant };
 
 public:
 
@@ -67,6 +70,14 @@ public:
         return SuffixArray(values, prefixTableLength);
     }
 
+    void query(QueryMode mode = QueryMode::Naive) const {
+        if (mode == QueryMode::SimpleAccelerant) {
+
+        } else {
+
+        }
+    }
+
     /**
      * @brief The underlying string data.
      * 
@@ -74,6 +85,14 @@ public:
      */
     std::string const& data() const noexcept {
         return data_;
+    }
+
+    double getSuffixArrayBuildTime() const noexcept {
+        return suffixArrayBuildTime_;
+    }
+
+    double getPrefixTableBuildTime() const noexcept {
+        return prefixTableBuildTime_;
     }
 
     /**
@@ -130,7 +149,7 @@ public:
         serial::serialize(suffixes_, ostream);
         serial::serialize(prefixTableSize_, ostream);
         if (prefixTableSize_ != 0) {
-            /* manually serialize std::map elements -- templates got a little hairy tyring to extend serialize */
+            /* manually serialize std::map elements -- templates got a little hairy trying to extend serialize */
             serial::serialize(prefixTable_.size(), ostream);
             for (auto const& [key, value] : prefixTable_) {
                 auto const& [start, end] = value;
@@ -186,11 +205,14 @@ public:
         return oss;
     }
 
+
 private:
     std::string data_;
     size_t prefixTableSize_;
+    double suffixArrayBuildTime_, prefixTableBuildTime_;
+
     std::vector<int32_t> suffixes_;
-    std::map<std::string, std::pair<int32_t, int32_t>> prefixTable_;
+    PrefixTable prefixTable_;
     std::array<int32_t, 256> histogram_;
 
     /**
@@ -207,17 +229,21 @@ private:
         timer.start();
         this->buildSuffixArray();
         timer.stop();
-        const auto saBuildTime = timer.secondsElapsed();
+        suffixArrayBuildTime_ = timer.millisecondsElapsed();
 
-        double prefixBuildTime = 0.0;
+        prefixTableBuildTime_ = 0.0;
         if (prefixTableSize_ != 0) {
             timer.start();
-            this->buildPrefixTable();
-            timer.stop();
-            prefixBuildTime = timer.secondsElapsed();
-        }
 
-        std::cout << data.size() << "," << prefixTableSize_ << "," << saBuildTime << "," << prefixBuildTime << "\n";
+            #if defined(_OPENMP)
+            buildPrefixTableParallel();
+            #else
+            buildPrefixTable(std::begin(suffixes_), std::end(suffixes_), prefixTable_);
+            #endif
+            
+            timer.stop();
+            prefixTableBuildTime_ = timer.millisecondsElapsed();
+        }
     }
 
     /**
@@ -240,32 +266,83 @@ private:
 
     /**
      * @brief Builds an internal prefix table. Allows instant jumping to the range containing any prefix of length k.
+     * 
+     * @param rangeStart Beginning of range to build from.
+     * @param rangeEnd end of range to build from.
+     * @param prefixTable what table to build into.
      */
-    void buildPrefixTable() {
-        /* capable of jumping to the suffix array interval corresponding to any prefix of length k */
-
+    void buildPrefixTable(std::vector<int32_t>::iterator rangeStart, std::vector<int32_t>::iterator rangeEnd, 
+        PrefixTable &prefixTable) {
         const uint32_t k = this->prefixTableSize_;
         const size_t dataLen = data_.size();
         auto const& data = data_;   /* local reference for lambda capture */
         
         /* find if two strings have same prefix; done in-place on data_ and with early exit */
-        auto hasSamePrefix = [&data, k](int32_t idx1, int32_t idx2) -> bool { return data.compare(idx1, k, data, idx2, k) == 0; };
+        auto hasSamePrefix = [&data, k](int32_t idx1, int32_t idx2) -> bool { 
+                return data.compare(idx1, k, data, idx2, k) == 0; };
 
         /* find first string with prefix length >= k */
-        auto iter = std::find_if(std::begin(suffixes_), std::end(suffixes_), [k, dataLen](auto offset) { return (dataLen-offset) >= k; });
+        auto iter = std::find_if(rangeStart, rangeEnd, [k, dataLen](auto offset) { return (dataLen-offset) >= k; });
 
-        while (iter != std::end(suffixes_)) {
+        while (std::distance(iter, rangeEnd) > 0) { // iter < rangeEnd
             std::string prefix = data_.substr(*iter, k);
 
-            /* find end of range */
-            const auto rangeEnd = std::find_if_not(iter, std::end(suffixes_), [&hasSamePrefix, &iter](auto idx) { return hasSamePrefix(*iter, idx); });
-            
-            const auto start = std::distance(std::begin(suffixes_), iter);
-            const auto end = std::distance(std::begin(suffixes_), rangeEnd) - 1;
-            prefixTable_.insert({prefix, {start, end}});
+            const auto endOfRange = std::find_if_not(iter, std::end(suffixes_), [&hasSamePrefix, &iter](auto idx) { 
+                    return hasSamePrefix(*iter, idx); });
 
-            iter = rangeEnd;
+            const auto start = std::distance(std::begin(suffixes_), iter);
+            const auto end = std::distance(std::begin(suffixes_), endOfRange) - 1;
+            prefixTable.insert({prefix, {start, end}});
+
+            iter = endOfRange;
         }
+    }
+
+    /**
+     * @brief Builds prefix table using multiple threads.
+     * @note This could be vastly improved by a thread-safe hash table implementation.
+     * 
+     */
+    void buildPrefixTableParallel() {
+        constexpr uint32_t NUM_CHUNKS = 128;
+        std::array<PrefixTable, NUM_CHUNKS> tables;
+
+        const uint32_t k = this->prefixTableSize_;
+        auto const& data = data_;   /* local reference for lambda capture */
+        auto hasSamePrefix = [&data, k](int32_t idx1, int32_t idx2) -> bool { 
+                return data.compare(idx1, k, data, idx2, k) == 0; };
+
+        prefixTable_.reserve(suffixes_.size());
+        for (auto &tab : tables) {
+            tab.reserve((suffixes_.size()-k+1) / NUM_CHUNKS);
+        }
+
+        #pragma omp parallel for
+        for (uint32_t i = 0; i < NUM_CHUNKS; i += 1) {
+
+            /* compute starting range */
+            auto iter = std::next(std::begin(suffixes_), i * suffixes_.size() / NUM_CHUNKS);
+            auto endOfRange = std::next(std::begin(suffixes_), (i+1) * suffixes_.size() / NUM_CHUNKS);
+
+            /* check if this is in an existing region -- if so seek to next region */
+            if (i != 0 && hasSamePrefix(*iter, *std::prev(iter))) {
+                iter = std::find_if_not(iter, endOfRange, [&hasSamePrefix, &iter](auto idx) { 
+                    return hasSamePrefix(*iter, idx); });
+            }
+
+            /* build out table */
+            this->buildPrefixTable(iter, endOfRange, tables.at(i));
+        }
+
+        /* rejoin tables */
+        for (auto const& tab : tables) {
+            prefixTable_.insert(std::begin(tab), std::end(tab));
+        }
+    }
+
+
+    void queryNaive() {
+        
     }
 };
 
