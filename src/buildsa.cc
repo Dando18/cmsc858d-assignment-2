@@ -9,6 +9,7 @@
 /* stl includes */
 #include <cstdlib>      // exit
 #include <exception>    // invalid_argument
+#include <filesystem>   // file_size
 #include <iostream>     // cerr, cout
 #include <string>       // string
 
@@ -31,9 +32,9 @@ int main(int argc, char **argv) {
     }
 
 
-    auto suffixarray = suffixarray::SuffixArray::fromFile(referencePath, preftab);
+    auto suffixArray = suffixarray::SuffixArray::fromFile(referencePath, preftab);
+    suffixArray.save(outputPath);
 
-    std::cout << "\n" << suffixarray;
-
-    suffixarray.save(outputPath);
+    std::cout << suffixArray.data().size() << "," << preftab << "," << suffixArray.getSuffixArrayBuildTime()
+        << "," << suffixArray.getPrefixTableBuildTime() << "," << std::filesystem::file_size(outputPath) << "\n";
 }
