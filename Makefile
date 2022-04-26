@@ -1,6 +1,7 @@
-CC = clang++-12
+#CC = clang++-12
+CC = g++-10
 OPT = -O3
-WARNINGS = -Wall -Werror -Wextra -pedantic -Wshadow
+WARNINGS = -Wall -Werror -Wextra -pedantic -Wshadow -Wno-unknown-pragmas
 STD = -std=c++20
 USE_OPENMP = 1
 DEBUGFLAGS = -DNDEBUG
@@ -34,15 +35,18 @@ BINDIR = bin
 SRCDIR = src
 INCDIR = include
 DOCSDIR = docs
-TARGETS = $(BINDIR)/buildsa $(BINDIR)/querysa
+TARGETS = $(BINDIR)/buildsa $(BINDIR)/querysa $(BINDIR)/tests
 
 all: $(TARGETS)
 
 $(BINDIR)/buildsa: $(SRCDIR)/buildsa.cc include/parseargs.h include/suffixarray.h include/utilities.h include/serial.h $(SAIS_STATICLIB)
 	$(CC) $(FLAGS) -I$(SAIS_INC) -o $@ $< $(SAIS_STATICLIB)
 
-$(BINDIR)/querysa: $(SRCDIR)/querysa.cc include/parseargs.h
-	$(CC) $(FLAGS) -o $@ $< 
+$(BINDIR)/querysa: $(SRCDIR)/querysa.cc include/parseargs.h include/suffixarray.h include/utilities.h include/serial.h $(SAIS_STATICLIB)
+	$(CC) $(FLAGS) -I$(SAIS_INC) -o $@ $< $(SAIS_STATICLIB)
+
+$(BINDIR)/tests: $(SRCDIR)/tests.cc $(wildcard include/*.h) $(SAIS_STATICLIB)
+	$(CC) $(TESTFLAGS) -I$(SAIS_INC) -o $@ $< $(SAIS_STATICLIB)
 
 $(SAIS_STATICLIB): $(wildcard $(SAIS_PATH)/src/*.c) $(wildcard $(SAIS_PATH)/src/*.h)
 	$(MAKE) -C $(SAIS_PATH) CFLAGS="$(SAIS_FLAGS)"
@@ -55,8 +59,11 @@ $(DOCSDIR): doc-config
 	doxygen doc-config
 	$(MAKE) -C $(DOCSDIR)/latex
 
+test: $(BINDIR)/tests
+	$(BINDIR)/tests
+
 clean:
 	$(MAKE) -C $(SAIS_PATH) clean
 	rm -f $(TARGETS)
 
-.PHONY: $(DOCSDIR)
+.PHONY: $(DOCSDIR) test
