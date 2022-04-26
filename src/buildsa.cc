@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     }
 
 
-    auto suffixArray = suffixarray::SuffixArray::fromFile(referencePath, preftab);
+    auto suffixArray = suffixarray::SuffixArray::fromFASTAFile(referencePath, preftab);
     suffixArray.save(outputPath);
 
     std::cout << suffixArray.data().size() << "," << preftab << "," << suffixArray.getSuffixArrayBuildTime()
