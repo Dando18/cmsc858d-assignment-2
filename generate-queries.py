@@ -1,12 +1,14 @@
 import random
 
-#input = 'inputs/sars-cov-2.fa'
-#output = 'inputs/sars-cov-2-queries.fa'
+input = 'inputs/sars-cov-2.fa'
+output = 'inputs/sars-cov-2-queries.fa'
 #input = 'inputs/GRCh38_latest_genomic.fa'
 #output = 'inputs/GRCh38_latest_genomic-queries.fa'
-input = 'inputs/fruitfly.fa'
-output = 'inputs/fruitfly-queries.fa'
-NUM_QUERIES = 33142
+#input = 'inputs/fruitfly.fa'
+#output = 'inputs/fruitfly-queries.fa'
+#input = 'inputs/fungus.fa'
+#output = 'inputs/fungus-queries.fa'
+NUM_QUERIES = 10000
 QUERY_LEN = (20, 40)
 
 def get_random_str(main_str, substr_len):
