@@ -9,7 +9,7 @@
 # ================
 BUILD_EXEC="./bin/buildsa"
 QUERY_EXEC="./bin/querysa"
-SEQUENCES="inputs/sars-cov-2.fa inputs/ecoli.fa inputs/fruitfly.fa"
+SEQUENCES="inputs/sars-cov-2.fa inputs/ecoli.fa inputs/fungus.fa"
 BUILD_SEQ_RESULTS_OUTPUT="results/buildsa-sequential.csv"
 BUILD_PAR_RESULTS_OUTPUT="results/buildsa-parallel.csv"
 QUERY_SEQ_RESULTS_OUTPUT="results/querysa-sequential.csv"
@@ -53,7 +53,7 @@ if [ -f inputs/ecoli.fa ]; then
         exit 1
     fi
 
-    rm naive-output.txt #simpleaccel-output.txt
+    rm naive-output.txt simpleaccel-output.txt
 fi
 
 # ===================
@@ -67,15 +67,15 @@ make clean > /dev/null && make USE_OPENMP=0 > /dev/null
 printf "seq_length,preftab,sa_build_time,preftab_build_time,file_size\n" > ${BUILD_SEQ_RESULTS_OUTPUT}
 printf "seq_length,preftab,mode,num_queries,total_query_time,avg_query_time\n" > ${QUERY_SEQ_RESULTS_OUTPUT}
 for sequence in ${SEQUENCES}; do
-    for preftab_size in 10; do
+    for preftab_size in 0 1 2 4 8 16 32 64; do
         sa_output_file="junk-buildsa-output.sa"
         query_output_file="junk-querysa-output.txt"
         query_input_file="${sequence%.fa}-queries.fa"
         
-        for repetition in {1..5}; do
+        for repetition in {1..3}; do
             ${BUILD_EXEC} ${sequence} ${sa_output_file} --preftab ${preftab_size} >> ${BUILD_SEQ_RESULTS_OUTPUT}
-            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} naive ${query_output_file} >> ${QUERY_SEQ_RESULTS_OUTPUT}
-            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} simpleaccel ${query_output_file} >> ${QUERY_SEQ_RESULTS_OUTPUT}
+            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} naive + >> ${QUERY_SEQ_RESULTS_OUTPUT}
+            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} simpleaccel + >> ${QUERY_SEQ_RESULTS_OUTPUT}
 
             rm -f ${sa_output_file} ${query_output_file}
         done
@@ -87,15 +87,15 @@ make clean > /dev/null && make USE_OPENMP=1 > /dev/null
 printf "seq_length,preftab,sa_build_time,preftab_build_time,file_size\n" > ${BUILD_PAR_RESULTS_OUTPUT}
 printf "seq_length,preftab,mode,num_queries,total_query_time,avg_query_time\n" > ${QUERY_PAR_RESULTS_OUTPUT}
 for sequence in ${SEQUENCES}; do
-    for preftab_size in 10; do
+    for preftab_size in 0 1 2 4 8 16 32 64; do
         sa_output_file="junk-buildsa-output.sa"
         query_output_file="junk-querysa-output.txt"
         query_input_file="${sequence%.fa}-queries.fa"
         
-        for repetition in {1..5}; do
+        for repetition in {1..3}; do
             ${BUILD_EXEC} ${sequence} ${sa_output_file} --preftab ${preftab_size} >> ${BUILD_PAR_RESULTS_OUTPUT}
-            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} naive ${query_output_file} >> ${QUERY_PAR_RESULTS_OUTPUT}
-            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} simpleaccel ${query_output_file} >> ${QUERY_PAR_RESULTS_OUTPUT}
+            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} naive + >> ${QUERY_PAR_RESULTS_OUTPUT}
+            ${QUERY_EXEC} ${sa_output_file} ${query_input_file} simpleaccel + >> ${QUERY_PAR_RESULTS_OUTPUT}
 
             rm -f ${sa_output_file} ${query_output_file}
         done
@@ -106,4 +106,4 @@ done
 # === PLOT RESULTS ===
 # ====================
 echo "Plotting results..."
-python3 generate-plots.py ${BUILD_SEQ_RESULTS_OUTPUT} ${BUILD_PAR_RESULTS_OUTPUT} junk
+python3 generate-plots.py ${BUILD_SEQ_RESULTS_OUTPUT} ${BUILD_PAR_RESULTS_OUTPUT} ${QUERY_SEQ_RESULTS_OUTPUT} ${QUERY_PAR_RESULTS_OUTPUT}

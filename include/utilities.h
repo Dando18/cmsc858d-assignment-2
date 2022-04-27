@@ -49,9 +49,9 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> begin_, end_;
 };
 
-template <typename Iterator>
-int32_t LCPLength(Iterator sBegin, Iterator sEnd, Iterator tBegin) {
-    auto const& [s, t] = std::mismatch(sBegin, sEnd, tBegin);
+template <typename Iterator1, typename Iterator2>
+inline auto LCPLength(Iterator1 sBegin, Iterator1 sEnd, Iterator2 tBegin, size_t offset=0) {
+    auto const& [s, t] = std::mismatch(std::next(sBegin, offset), sEnd, std::next(tBegin, offset));
     return std::min(std::distance(sBegin, s), std::distance(tBegin, t));
 }
 

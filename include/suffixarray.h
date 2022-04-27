@@ -12,9 +12,10 @@
 #include <array>        // array
 #include <exception>    // ios_base::failure
 #include <execution>    // execution::par_unseq
+#include <filesystem>   // file_size
 #include <fstream>      // ifstream
 #include <ostream>      // ostream
-#include <random>       // 
+#include <random>       // mt19937, random_device, uniform_int_distribution
 #include <string>       // string
 #include <unordered_map>// unordered_map
 
@@ -53,6 +54,7 @@ public:
         }
 
         std::string sequence, line;
+        sequence.reserve(std::filesystem::file_size(path)); // reserve roughly the number of bytes in the file
         while (std::getline(inputFile, line)) {
             if (line.starts_with(">")) {
                 continue;
@@ -114,24 +116,34 @@ public:
         /* lower_bound */
         auto [lower, upper] = std::tuple(searchStart, searchEnd);
         auto range = std::distance(lower, upper);
+        uint32_t lowerLCP = 0, upperLCP = 0;
+        if (mode == SimpleAccelerant) {
+            lowerLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *lower));
+            upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *std::next(lower, range/2)));
+        }
+        size_t searchOffset = 0;
         while (range > 0) {
             auto iter = lower;
             auto step = range / 2;
             std::advance(iter, step);
 
-            size_t searchOffset = 0;
-            if (mode == SimpleAccelerant) {
-                const auto lowerLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *lower));
-                const auto upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *iter));
-                searchOffset = std::min(lowerLCP, upperLCP);
-            }
-            const auto searchLength = q.query.size() - searchOffset;            
+            searchOffset = (mode == SimpleAccelerant) ? std::min(lowerLCP, upperLCP) : 0;
+            const auto searchLength = q.query.size() - searchOffset;
 
             if (data_.compare((*iter)+searchOffset, searchLength, q.query, searchOffset, searchLength) < 0) {  /* true if data_[] < queryStr */
                 lower = ++iter;
                 range -= step + 1;
+
+                if (mode == SimpleAccelerant) {
+                    lowerLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *lower), searchOffset);
+                    upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *std::next(lower, range/2)));
+                }
             } else {
                 range = step;
+
+                if (mode == SimpleAccelerant) {
+                    upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *std::next(lower, range/2)), searchOffset);
+                }
             }
         }
         const auto lowerIndex = lower;
@@ -139,24 +151,32 @@ public:
         /* upper_bound */
         std::tie(lower, upper) = std::tuple(searchStart, searchEnd);
         range = std::distance(lower, upper);
+        if (mode == SimpleAccelerant) {
+            lowerLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *lower));
+            upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *std::next(lower, range/2)));
+        }
         while (range > 0) {
             auto iter = lower;
             auto step = range / 2;
             std::advance(iter, step);
 
-            size_t searchOffset = 0;
-            if (mode == SimpleAccelerant) {
-                const auto lowerLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *lower));
-                const auto upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *iter));
-                searchOffset = std::min(lowerLCP, upperLCP);
-            }
+            searchOffset = (mode == SimpleAccelerant) ? std::min(lowerLCP, upperLCP) : 0;
             const auto searchLength = q.query.size() - searchOffset; 
 
             if (q.query.compare(searchOffset, searchLength, data_, (*iter)+searchOffset, searchLength) >= 0) {
                 lower = ++iter;
                 range -= step + 1;
+
+                if (mode == SimpleAccelerant) {
+                    lowerLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *lower), searchOffset);
+                    upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *std::next(lower, range/2)));
+                }
             } else {
                 range = step;
+
+                if (mode == SimpleAccelerant) {
+                    upperLCP = utilities::LCPLength(std::cbegin(q.query), std::cend(q.query), std::next(std::begin(data_), *std::next(lower, range/2)), searchOffset);
+                }
             }
         }
         const auto upperIndex = lower;

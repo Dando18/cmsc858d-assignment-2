@@ -37,9 +37,7 @@ int main(int argc, char **argv) {
     utilities::Timer timer;
 
     /* perform queries */
-    std::ofstream outputFile(outputPath);
     auto queries = parseFastaQueries(queriesPath);
-
     timer.start();
     suffixArray.queries(std::begin(queries), std::end(queries), queryMode);
     timer.stop();
@@ -48,15 +46,18 @@ int main(int argc, char **argv) {
     std::cout << suffixArray.data().size() << "," << suffixArray.getPrefixTableSize() << ","
         << queryModeStr << "," << queries.size() << "," << duration << "," << avgDuration << "\n";
     
-    for (auto const& q : queries) {
-        outputFile << q.title << '\t' << q.result.size();
-        for (auto const& index : q.result) {
-            outputFile << '\t' << index;
+    if (outputPath != "+") {
+        std::ofstream outputFile(outputPath);
+        for (auto const& q : queries) {
+            outputFile << q.title << '\t' << q.result.size();
+            for (auto const& index : q.result) {
+                outputFile << '\t' << index;
+            }
+            outputFile << '\n';
         }
-        outputFile << '\n';
+        outputFile.flush();
+        outputFile.close();
     }
-    outputFile.flush();
-    outputFile.close();
 }
 
 
